@@ -8,6 +8,7 @@ import hmac
 from urllib.parse import urlencode
 import json
 import requests
+import configparser
 
 
 class AssembleHeaderException(Exception):
@@ -116,7 +117,7 @@ class WebsocketDemo:
         print('onMessage：\n' + response.content.decode())
         tempResult = json.loads(response.content.decode())
         print('text字段解析：\n' + base64.b64decode(tempResult['payload']['result']['text']).decode())
-        return json.loads(base64.b64decode(tempResult['payload']['result']['text']).decode())
+        return self.parse_result_to_text(json.loads(base64.b64decode(tempResult['payload']['result']['text']).decode()))
 
     def parse_result_to_text(self, res_dict):
         """
@@ -124,29 +125,53 @@ class WebsocketDemo:
         :param res_dict:
         :return:
         """
-        output_text = ""
-        for key, values in res_dict.item():
+        tok_index_pos_map = list(range(0, len(self.text)))
+        text = self.text
+        grammar_list = []
+        for key, values in res_dict.items():
             if len(values) >= 1:
-                for val in values:
-                    pos = val[0]
-                    cur = val[1]
-                    cor = val[2]
-                    desc = val[3]
-                    self.text = self.text[:pos] +
+                grammar_list.extend(values)
+        grammar_list = sorted(grammar_list, key=lambda x: x[0])
+
+        for grammar in grammar_list:
+            text, tok_index_pos_map = self.insert_to_text(text, grammar, tok_index_pos_map)
+
+        return text
+
+    def insert_to_text(self, text, cor_info, tok_index_pos_map):
+        """
+        :param tok_index_pos_map:
+        :param text:
+        :param cor_info:
+        :return:
+        """
+        pos, cur, cor, desc = cor_info
+        pos = int(pos)
+        cor_len = len(cor) + 11
+        offset_list = [0] * pos + [cor_len] * (len(text) - pos)
+        text = text[:tok_index_pos_map[pos]] + f"\033[33m[{cor}]\033[0m" + text[tok_index_pos_map[pos]:]
+        tok_index_pos_map = list(map(lambda x, y: x + y, offset_list, tok_index_pos_map))
+        return text, tok_index_pos_map
 
 
 if __name__ == '__main__':
     # 控制台获取
-    APPId = "737a4951"
-    APISecret = "NjUyNmFkNTkxNGJjOGQ1NmEzMDYzYTFk"
-    APIKey = "012a3e0cd4229c94e9fc0a643f574ffc"
+    con = configparser.ConfigParser()
 
+    con.read("./config.ini", encoding="utf-8")
+    APPId = con.get("APP", "APPId")
+    APISecret = con.get("APP", "APISecret")
+    APIKey = con.get("APP", "APIKey")
+    max_length = con.getint("APP", "Max_length")
     # 需纠错文本
     Text = ""
     demo = WebsocketDemo(APPId, APISecret, APIKey, Text)
 
     while Text != "q":
-        Text = input("请输入检查文本：")
+        Text = input("请输入检查文本：<长度不得超过1500个字符>\n")[:max_length]
         demo.set_text(Text)
-        result = demo.get_result()
-
+        try:
+            result = demo.get_result()
+            print(result)
+        except Exception as e:
+            print(e)

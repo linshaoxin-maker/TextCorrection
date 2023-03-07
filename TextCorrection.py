@@ -168,10 +168,16 @@ if __name__ == '__main__':
     demo = WebsocketDemo(APPId, APISecret, APIKey, Text)
 
     while Text != "q":
-        Text = input("请输入检查文本：<长度不得超过1500个字符>\n")[:max_length]
-        demo.set_text(Text)
-        try:
-            result = demo.get_result()
-            print(result)
-        except Exception as e:
-            print(e)
+        Text = input("请输入检查文本：<长度不得超过1500个字符>\n")
+        start = 0
+        while start < len(Text):
+            input_text = Text[start:start+max_length]
+            demo.set_text(Text)
+            try:
+                result = demo.get_result()
+                print(result)
+            except Exception as e:
+                print(e)
+            start += max_length
+
+
